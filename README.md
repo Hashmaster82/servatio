@@ -32,7 +32,7 @@ Servatio — это альтернатива `rsync` для Windows с граф�
 
 ```powershell
 # Клонируйте репозиторий
-git clone https://github.com/ваш-ник/servatio.git
+git clone https://github.com/Hashmaster82/servatio.git
 cd servatio
 
 # Установите зависимости
@@ -40,3 +40,5 @@ pip install -r requirements.txt
 
 # Запустите программу
 python app.py
+Или 
+run.bat
