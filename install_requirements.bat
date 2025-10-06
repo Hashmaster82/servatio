@@ -38,7 +38,7 @@ if %errorlevel% equ 0 (
     echo.
     echo ✅ Все зависимости успешно установлены!
     echo Теперь вы можете запустить Servatio командой:
-    echo      python servatio.py
+    echo      python app.py
 ) else (
     echo.
     echo ❌ Произошла ошибка при установке зависимостей.
