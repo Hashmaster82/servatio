@@ -26,7 +26,8 @@ logs/
 
 # IDE
 .vscode/
-.idea/
+.idea
+.venv
 *.swp
 *.swo
 
