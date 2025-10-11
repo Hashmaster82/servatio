@@ -25,16 +25,20 @@ TRAY_AVAILABLE = False
 try:
     import pystray
     from PIL import Image, ImageDraw
-
     TRAY_AVAILABLE = True
 except ImportError:
     pass
 
+
 # === Настройки ===
+CONFIG_FILE = Path.home() / ".servatio_config.ini"
+DEFAULT_EXCLUDE_PATTERNS = [
+    "*.tmp", "*.log", ".git", ".gitignore", "__pycache__", "*.pyc",
+    ".DS_Store", "Thumbs.db", "desktop.ini", "$RECYCLE.BIN", "System Volume Information"
+]
+
 # Папка логов по умолчанию
 DEFAULT_LOG_DIR = Path.home() / "Documents" / "Servatio" / "Logs"
-# Файл конфига будет в той же папке, что и логи
-CONFIG_FILE_NAME = "servatio_config.ini"
 
 progress_info = {
     "total_files": 0,
@@ -343,7 +347,6 @@ class TaskDialog:
         ttk.Label(options_frame, text="Исключения (по одному на строку):").pack(anchor="w", pady=(10, 5))
         self.exclude_text = tk.Text(options_frame, height=6, wrap=tk.WORD)
         self.exclude_text.pack(fill="x", pady=5)
-        # Правильная загрузка исключений
         patterns = task.exclude_patterns if task else DEFAULT_EXCLUDE_PATTERNS
         self.exclude_text.insert("1.0", "\n".join(patterns))
 
@@ -373,10 +376,8 @@ class TaskDialog:
             messagebox.showerror("Ошибка", "Заполните все поля!")
             return
 
-        # Правильное извлечение исключений из текстового поля
         exclude_content = self.exclude_text.get("1.0", tk.END).strip()
         exclude_patterns = [line.strip() for line in exclude_content.splitlines() if line.strip()]
-        print(f"Сохраняем исключения: {exclude_patterns}")  # Отладка
 
         self.result = BackupTask(
             name=name,
@@ -405,7 +406,6 @@ class ServatioApp:
         self.log_file = None
         self.log_dir = DEFAULT_LOG_DIR
 
-        # Загружаем конфиг до инициализации GUI
         self.load_config()
         self.setup_theme()
         self.create_widgets()
@@ -416,8 +416,7 @@ class ServatioApp:
         if os.name == 'nt':
             try:
                 import winreg
-                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                     r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
                 value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
                 dark_mode = (value == 0)
                 winreg.CloseKey(key)
@@ -461,10 +460,8 @@ class ServatioApp:
         self.task_listbox.bind("<<ListboxSelect>>", self.on_task_select)
 
         ttk.Button(left_frame, text="➕ Добавить", command=self.add_task).grid(row=1, column=0, sticky="ew", padx=(0, 5))
-        ttk.Button(left_frame, text="✏️ Редактировать", command=self.edit_task).grid(row=2, column=0, sticky="ew",
-                                                                                     padx=(0, 5), pady=5)
-        ttk.Button(left_frame, text="🗑️ Удалить", command=self.delete_task).grid(row=3, column=0, sticky="ew",
-                                                                                 padx=(0, 5))
+        ttk.Button(left_frame, text="✏️ Редактировать", command=self.edit_task).grid(row=2, column=0, sticky="ew", padx=(0, 5), pady=5)
+        ttk.Button(left_frame, text="🗑️ Удалить", command=self.delete_task).grid(row=3, column=0, sticky="ew", padx=(0, 5))
 
         # Правая панель
         right_frame = ttk.Frame(self.root)
@@ -505,8 +502,6 @@ class ServatioApp:
         btn_frame.grid(row=5, column=0, pady=10)
         self.run_btn = ttk.Button(btn_frame, text="▶️ Запустить задачу", command=self.run_task, state="disabled")
         self.run_btn.pack(side="left", padx=5)
-        self.run_all_btn = ttk.Button(btn_frame, text="▶️ Все задачи", command=self.run_all_tasks, state="normal")
-        self.run_all_btn.pack(side="left", padx=5)
         self.open_log_btn = ttk.Button(btn_frame, text="📂 Открыть лог", command=self.open_log_file, state="disabled")
         self.open_log_btn.pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Очистить лог", command=self.clear_log).pack(side="left", padx=5)
@@ -555,7 +550,6 @@ class ServatioApp:
         dialog = TaskDialog(self.root)
         self.root.wait_window(dialog.top)
         if dialog.result:
-            print(f"Добавляем задачу: {dialog.result.name}, исключения: {dialog.result.exclude_patterns}")  # Отладка
             self.tasks.append(dialog.result)
             self.update_task_list()
             self.save_config()
@@ -566,12 +560,9 @@ class ServatioApp:
             messagebox.showwarning("Внимание", "Выберите задачу для редактирования!")
             return
         idx = selection[0]
-        original_task = self.tasks[idx]
-        print(f"Редактируем задачу: {original_task.name}, исключения: {original_task.exclude_patterns}")  # Отладка
-        dialog = TaskDialog(self.root, original_task)
+        dialog = TaskDialog(self.root, self.tasks[idx])
         self.root.wait_window(dialog.top)
         if dialog.result:
-            print(f"Сохраняем задачу: {dialog.result.name}, исключения: {dialog.result.exclude_patterns}")  # Отладка
             self.tasks[idx] = dialog.result
             self.update_task_list()
             self.save_config()
@@ -590,29 +581,20 @@ class ServatioApp:
             self.update_task_list()
             self.save_config()
 
-    @property
-    def config_file(self):
-        # Путь к конфигу находится в папке логов
-        return self.log_dir / CONFIG_FILE_NAME
-
     def save_config(self):
-        # Убедимся, что папка логов существует
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-
         config = configparser.ConfigParser()
         config["global"] = {"log_dir": str(self.log_dir)}
         for i, task in enumerate(self.tasks):
             config[f"task_{i}"] = task.to_dict()
-        with open(self.config_file, 'w', encoding='utf-8') as f:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             config.write(f)
 
     def load_config(self):
-        config_path = self.config_file
-        if not config_path.exists():
+        if not CONFIG_FILE.exists():
             return
         config = configparser.ConfigParser()
         try:
-            config.read(config_path, encoding='utf-8')
+            config.read(CONFIG_FILE, encoding='utf-8')
             if "global" in config:
                 log_dir_str = config["global"].get("log_dir")
                 if log_dir_str:
@@ -621,7 +603,6 @@ class ServatioApp:
             i = 0
             while f"task_{i}" in config:
                 task = BackupTask.from_dict(config[f"task_{i}"])
-                print(f"Загружена задача: {task.name}, исключения: {task.exclude_patterns}")  # Отладка
                 self.tasks.append(task)
                 i += 1
         except Exception as e:
@@ -675,8 +656,8 @@ class ServatioApp:
         free_space = get_free_space(dst_path)
         if src_size > free_space:
             if not messagebox.askyesno(
-                    "Недостаточно места",
-                    f"Размер: {src_size / (1024 ** 3):.2f} ГБ\nСвободно: {free_space / (1024 ** 3):.2f} ГБ\nПродолжить?"
+                "Недостаточно места",
+                f"Размер: {src_size / (1024**3):.2f} ГБ\nСвободно: {free_space / (1024**3):.2f} ГБ\nПродолжить?"
             ):
                 return
 
@@ -699,7 +680,6 @@ class ServatioApp:
         self.log_message("=" * 70)
         self.log_message(f"Запуск задачи: {self.current_task.name}")
         self.log_message(f"Лог: {self.log_file}")
-        self.log_message(f"Исключения: {self.current_task.exclude_patterns}")  # Отладка
 
         thread = threading.Thread(
             target=self.run_sync_in_thread,
@@ -708,132 +688,47 @@ class ServatioApp:
         )
         thread.start()
 
-    def run_all_tasks(self):
-        if not self.tasks:
-            messagebox.showinfo("Информация", "Нет задач для выполнения.")
-            return
-
-        # Сбрасываем прогресс
-        self.progress_var.set(0)
-        self.progress_label.config(text="Запуск всех задач...")
-        self.run_btn.config(state="disabled")
-        self.run_all_btn.config(state="disabled", text="⏳ Выполняется...")
-        self.clear_log()
-        self.log_message("=" * 70)
-        self.log_message(f"Запуск всех задач ({len(self.tasks)})")
-
-        # Запускаем все задачи в отдельном потоке
-        thread = threading.Thread(target=self.run_all_in_thread, daemon=True)
-        thread.start()
-
-    def run_all_in_thread(self):
-        for i, task in enumerate(self.tasks):
-            self.root.after(0, lambda t=task: self.log_message(f"\n--- Задача {i + 1}/{len(self.tasks)}: {t.name} ---"))
-            self.run_single_task(task)
-
-        self.root.after(0, self.on_all_tasks_complete)
-
-    def run_single_task(self, task):
-        src_path = Path(task.source).resolve()
-        dst_path = Path(task.destination).resolve()
-
-        try:
-            validate_paths(src_path, dst_path)
-        except ValueError as e:
-            self.root.after(0, lambda: messagebox.showerror("Ошибка валидации", str(e)))
-            self.log_message(f"❌ Ошибка валидации: {e}")
-            return
-
-        src_size = get_folder_size(src_path)
-        free_space = get_free_space(dst_path)
-        if src_size > free_space:
-            self.log_message(f"⚠️ Недостаточно места для задачи '{task.name}'")
-            return
-
-        # Создаём папку логов и файл
-        self.log_dir.mkdir(parents=True, exist_ok=True)
-        safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in task.name)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = self.log_dir / f"{safe_name}_{timestamp}.log"
-
-        # Обновляем прогресс
-        total_files = get_total_files(src_path, task.exclude_patterns)
-        global progress_info
-        progress_info = {
-            "total_files": total_files,
-            "processed_files": 0,
-            "current_file": "",
-            "lock": threading.Lock()
-        }
-
-        self.root.after(0, lambda: self.log_message(f"Запуск задачи: {task.name}"))
-        self.root.after(0, lambda: self.log_message(f"Лог: {log_file}"))
-        self.root.after(0, lambda t=task: self.log_message(f"Исключения: {t.exclude_patterns}"))  # Отладка
-
+    def run_sync_in_thread(self, src_path, dst_path):
         try:
             enable_long_paths()
 
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
             formatter = logging.Formatter('%(asctime)s | %(message)s', datefmt='%H:%M:%S')
             file_handler.setFormatter(formatter)
             logging.getLogger().addHandler(file_handler)
             logging.getLogger().setLevel(logging.INFO)
 
             def gui_logger(msg):
-                self.root.after(0, lambda m=msg: self.log_message(m))
+                self.log_message(msg)
                 logging.info(msg)
 
-            should_delete = task.delete_extra
+            should_delete = self.current_task.delete_extra
             sync_recursive(
                 src_path, dst_path,
-                task.exclude_patterns,
+                self.current_task.exclude_patterns,
                 gui_logger,
                 self.update_progress,
                 should_delete
             )
 
-            self.root.after(0, lambda: self.log_message(f"✅ Задача '{task.name}' завершена!"))
+            self.log_message("✅ Задача успешно завершена!")
             logging.info("✅ Задача успешно завершена!")
 
+            self.root.after(0, self.show_completion_notification)
+
         except Exception as e:
-            error_msg = f"❌ Ошибка в задаче '{task.name}': {e}"
-            self.root.after(0, lambda: self.log_message(error_msg))
+            error_msg = f"❌ Ошибка: {e}"
+            self.log_message(error_msg)
             logging.exception(error_msg)
+            self.root.after(0, lambda: messagebox.showerror("Ошибка", str(e)))
+        finally:
+            self.root.after(0, self.on_task_complete)
 
     def on_task_complete(self):
         self.run_btn.config(state="normal", text="▶️ Запустить задачу")
         self.open_log_btn.config(state="normal")
         self.progress_var.set(0)
         self.progress_label.config(text="Готово.")
-
-    def on_all_tasks_complete(self):
-        self.run_btn.config(state="normal")
-        self.run_all_btn.config(state="normal", text="▶️ Все задачи")
-        self.progress_var.set(0)
-        self.progress_label.config(text="Все задачи завершены.")
-        self.log_message("\n" + "=" * 70)
-        self.log_message("Все задачи завершены!")
-
-        try:
-            import winsound
-            winsound.MessageBeep(winsound.MB_OK)
-        except:
-            pass
-
-        if TRAY_AVAILABLE:
-            def on_clicked(icon, item):
-                icon.stop()
-                self.root.deiconify()
-
-            image = create_image()
-            icon = pystray.Icon("Servatio", image, "Servatio", menu=pystray.Menu(
-                pystray.MenuItem("Открыть", on_clicked),
-                pystray.MenuItem("Выход", lambda icon, item: icon.stop())
-            ))
-            icon.run_detached()
-            self.root.after(1000, lambda: icon.notify("Все задачи завершены!", "Servatio"))
-        else:
-            messagebox.showinfo("Готово", "Все задачи завершены!")
 
     def show_completion_notification(self):
         try:
