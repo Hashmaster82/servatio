@@ -6,7 +6,8 @@ import fnmatch
 def enable_long_paths():
     if os.name == 'nt':
         try:
-            ctypes.windll.kernel32.SetDllDirectoryW(None)
+            # Включить поддержку длинных путей в Windows
+            ctypes.windll.kernel32.SetFileApisToOEM()
         except Exception:
             pass
 
@@ -44,6 +45,9 @@ def get_total_files(src: Path, exclude_patterns):
             if item.is_file() and not is_excluded(item, exclude_patterns, src):
                 count += 1
     except PermissionError:
+        pass
+    except OSError:
+        # Игнорируем ошибки с именами файлов/длинными путями
         pass
     return count
 

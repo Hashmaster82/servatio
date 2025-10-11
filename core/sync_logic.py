@@ -24,6 +24,9 @@ def sync_recursive(task, metrics: BackupMetrics, log_callback, update_progress, 
     except PermissionError as e:
         log_callback(f"⚠️ Нет доступа к {src} или {dst}: {e}")
         return
+    except OSError as e:
+        log_callback(f"⚠️ Ошибка доступа к файлам в {src} или {dst}: {e}")
+        return
 
     for name, src_path in src_items.items():
         dst_path = dst / name
@@ -49,6 +52,7 @@ def safe_copy(src: Path, dst: Path, log_callback, update_progress, metrics):
     try:
         dst.parent.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
+            # Используем shutil.copytree с dirs_exist_ok=True
             shutil.copytree(src, dst, dirs_exist_ok=True)
         else:
             shutil.copy2(src, dst)
