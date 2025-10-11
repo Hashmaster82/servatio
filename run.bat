@@ -8,7 +8,7 @@ set "SCRIPT_DIR=%~dp0"
 if not exist ".git" (
     echo Repository not found. Skipping update.
     echo Starting application...
-    python app.py
+    python main.py
     goto :eof
 )
 
@@ -33,6 +33,6 @@ if errorlevel 1 (
 
 echo.
 echo Starting Servatio...
-python app.py
+python main.py
 
 pause
